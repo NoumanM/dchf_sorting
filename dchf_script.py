@@ -1,9 +1,11 @@
 import csv
 import os
+import traceback
 from pathlib import Path
 from datetime import date
 import re
 import chardet
+
 
 def detect_encoding(file_path):
     with open(file_path, 'rb') as file:
@@ -17,6 +19,7 @@ def read_csv(file_path):
     with open(file_path, 'r', encoding=encoding, errors='ignore') as file:
         reader = csv.reader(file)
         return list(reader)
+
 
 file_name = f'DCHF-output-{date.today()}.csv'
 BaseDir = Path(__file__).resolve().parent
@@ -102,7 +105,7 @@ all_country_sorted_list = {}
 for spec, states in all_state_sorted_list.items():
     all_country_sorted_list.update({spec: {}})
     for state in states.keys():
-        all_country_sorted_list[spec].update({state:{}})
+        all_country_sorted_list[spec].update({state: {}})
         for country in sorted(all_country_set):
             all_country_sorted_list[spec][state][country] = []
             d = all_state_sorted_list[spec][state]
@@ -157,14 +160,14 @@ for spec, states in group_name_sorted_list.items():
         for countries in states.values():
             for country in countries.keys():
                 try:
-                    if len(group_name_sorted_list[spec][state][country]) == 0:
+                    if len(group_name_sorted_list[spec][state].get(country, '')) == 0:
                         continue
                     address_sorted_list[spec][state].update({country: {}})
                     for group in countries.values():
                         for gr_name in group.keys():
-                            if len(group_name_sorted_list[spec][state][country][gr_name]) == 0:
+                            if len(group_name_sorted_list[spec][state][country].get(gr_name, '')) == 0:
                                 continue
-                            address_sorted_list[spec][state][country].update({gr_name:{}})
+                            address_sorted_list[spec][state][country].update({gr_name: {}})
                             all_data = group_name_sorted_list[spec][state][country][gr_name]
                             if len(all_data) == 0:
                                 continue
@@ -180,10 +183,18 @@ for spec, states in group_name_sorted_list.items():
                                         if m['AddressLine1'] == address:
                                             address_sorted_list[spec][state][country][gr_name][address].append(m)
 
-                except:
+                except Exception as e:
+                    print(e)
+                    traceback.print_exc()
                     pass
 
-
+all_address_size = 0
+for spec, states in address_sorted_list.items():
+    for state, countries in states.items():
+        for country, groups in countries.items():
+            for group, addresses in groups.items():
+                all_address_size += len(addresses)
+print(f"Total address size: {all_address_size}")
 
 data_list = []
 for k in address_sorted_list.keys():
@@ -201,8 +212,6 @@ for k in address_sorted_list.keys():
                     for t in r:
                         data_list.append(t.values)
 print(len(data_list))
-
-
 
 common_spealities = ['Ophthalmology']
 
@@ -239,7 +248,7 @@ facilities = [
     'Technician/Technologist - Optician'
 ]
 
-#group and address Sorted PCP
+# group and address Sorted PCP
 exist = False
 if os.path.isfile(file_name):
     exist = True
@@ -317,10 +326,11 @@ with open(file_name, 'a+', encoding='utf-8', newline='') as file:
                     for addresses in one_group_data.keys():
                         d = one_group_data[addresses]
                         for data in d:
-                            if (data['Source'] != 'PCP' and data['Source'] != 'BehavioralHealthSpecialist' and data['Specialty'] not in dental_provider and data[
-                                'Specialty'] not in vision_providers and data['Specialty'] not in facilities and data[
-                                    'Specialty'] != 'Pharmacy' and data['Source'] != 'NULL' and data['Source'] != 'Facility' and data[
-                                    'Source'] != 'Null') or data['Specialty'] in common_spealities:
+                            # if (data['Source'] != 'PCP' and data['Source'] != 'BehavioralHealthSpecialist' and data['Specialty'] not in dental_provider and data[
+                            #     'Specialty'] not in vision_providers and data['Specialty'] not in facilities and data[
+                            #         'Specialty'] != 'Pharmacy' and data['Source'] != 'NULL' and data['Source'] != 'Facility' and data[
+                            #         'Source'] != 'Null') or data['Specialty'] in common_spealities:
+                            if data['Source'] == 'Specialist' or data['Source'] == 'NULL' or data['Source'] == 'Null':
                                 if not exist:
                                     writer.writerow(data.keys())
                                     exist = True
@@ -350,8 +360,6 @@ with open(file_name, 'a+', encoding='utf-8', newline='') as file:
                                     exist = True
                                 writer.writerow(data.values())
 
-
-
 ##################### dental_provider
 if os.path.isfile(file_name):
     exist = True
@@ -370,7 +378,8 @@ with open(file_name, 'a+', encoding='utf-8', newline='') as file:
                     for addresses in one_group_data.keys():
                         d = one_group_data[addresses]
                         for data in d:
-                            if data['Specialty'] in dental_provider:
+                            # if data['Specialty'] in dental_provider:
+                            if data['Source'] == 'Dental':
                                 if not exist:
                                     writer.writerow(data.keys())
                                     exist = True
@@ -394,7 +403,8 @@ with open(file_name, 'a+', encoding='utf-8', newline='') as file:
                     for addresses in one_group_data.keys():
                         d = one_group_data[addresses]
                         for data in d:
-                            if data['Specialty'] in vision_providers:
+                            # if data['Specialty'] in vision_providers:
+                            if data['Source'] == 'Vision':
                                 if not exist:
                                     writer.writerow(data.keys())
                                     exist = True
@@ -418,7 +428,7 @@ with open(file_name, 'a+', encoding='utf-8', newline='') as file:
                     for addresses in one_group_data.keys():
                         d = one_group_data[addresses]
                         for data in d:
-                            if data['Specialty'] in facilities or data['Source'] == 'Facility':
+                            if data['Source'] == 'Facility':
                                 if not exist:
                                     writer.writerow(data.keys())
                                     exist = True
